@@ -1,6 +1,7 @@
-import { constant, isEmpty, size } from 'lodash';
-import React, { useState } from 'react';
-import shortid, { isValid } from 'shortid';
+import { isEmpty, size } from 'lodash';
+import React, { useState, useEffect } from 'react';
+/* import shortid from 'shortid'; */
+import { addDocument, deleteDocument, getCollection, updateDocument } from './actions';
 
 function App() {
   const [task, setTask] = useState("");
@@ -8,6 +9,17 @@ function App() {
   const [editMode, setEditMode] = useState(false);
   const [id, setId] = useState("");
   const [error, setError] = useState(null);
+
+  // debe mostrar la data luego de cargada la pagina
+  useEffect(()=>{
+    (async () =>{
+        const result = await getCollection('tasks');
+        //console.log(result);
+        if (result.statusResponse){
+          setTasks(result.data);
+        }
+    })()
+  }, [])
 
   const validForm = () =>{
     let isValid = true;
@@ -18,22 +30,33 @@ function App() {
     }
     return isValid;
   }
-  const addTask = (e) => {
+  const addTask = async (e) => {
     e.preventDefault();
     if(!validForm()){
       return;
     }
-    const newTask = {
+   /*  const newTask = {
       id : shortid.generate(),
       name: task
     };
-    setTasks([...tasks, newTask]);
+    setTasks([...tasks, newTask]); */
+    const result = await addDocument("tasks" ,{ name:task });
+    if (!result.statusResponse){
+      setError(result.error);
+      return;
+    }
+    setTasks([...tasks, {id: result.data.id, name: task}]);
     setTask("");
   }
-  const saveTask = (e) => {
+  const saveTask = async (e) => {
     e.preventDefault();
     if(!validForm()){
       return;
+    }
+    const result = await updateDocument("tasks", id, { name:task });
+    if(!result.statusResponse){
+       setError(result.error);
+       return;
     }
     const editedTasks = tasks.map(item => item.id === id ? {id, name: task} : item);
     setTasks(editedTasks);
@@ -41,9 +64,14 @@ function App() {
     setTask("");
     setId("");
   }
-  const deleteTask = (id) => {
-    const filteredTask = tasks.filter(task=>task.id !== id);
-    setTasks(filteredTask);
+  const deleteTask = async (id) => {
+    const result = await deleteDocument('tasks', id);
+    if (!result.statusResponse){
+      setError(result.error);
+      return;
+    }
+    const filteredTasks = tasks.filter(task=>task.id !== id);
+    setTasks(filteredTasks);
   }
   const editTask = (task) => {
     setTask(task.name);
@@ -58,7 +86,7 @@ function App() {
        <div className="col-8">
           <h4 className="text-center">Task List</h4>
           { 
-            size(tasks) == 0 ? (
+            size(tasks) === 0 ? (
               /* <h5 className="text-center"> Aun no hay lista de tareas programadas </h5> */
               <li className="list-group-item">There is not proggrammed task List</li>
             ) : (
